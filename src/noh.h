@@ -347,6 +347,10 @@ typedef struct {
     const char *elems;
 } Noh_String_View;
 
+// Increases the position of a string view by the specified amount, reducing its count by the same
+// amount. If the end is reached, the string view will remain empty without moving further.
+void noh_sv_increase_position(Noh_String_View *sv, size_t distance);
+
 // Finds the first occurrence of the specified delimiter in a string view and returns the part of the string until 
 // that delimiter. The string view itself is shrunk to start after the delimiter.
 Noh_String_View noh_sv_chop_by_delim(Noh_String_View *sv, char delim);
@@ -412,6 +416,8 @@ int noh_sv_index_of_ci(Noh_String_View a, Noh_String_View b);
 // Creates a cstring in an arena from a string view.
 const char *noh_sv_to_arena_cstr(Noh_Arena *arena, Noh_String_View sv);
 
+// Creates a substring from a string-view, where the start and end are capped to the bounds of the input string view.
+Noh_String_View noh_sv_substring(Noh_String_View *sv, size_t start, size_t length);
 
 // printf macros for Noh_String_View or Noh_String.
 #define Nsv_Fmt "%.*s"
@@ -765,7 +771,7 @@ defer:
 
 ///////////////////////// String view /////////////////////////  
 
-static void increase_sv_position(Noh_String_View *sv, size_t distance) {
+void noh_sv_increase_position(Noh_String_View *sv, size_t distance) {
     if (distance < sv->count) {
         sv->count -= distance;
         sv->elems += distance;
@@ -784,7 +790,7 @@ Noh_String_View noh_sv_chop_by_delim(Noh_String_View *sv, char delim) {
     Noh_String_View result = { .count = i, .elems = sv->elems };
 
     // Update the current string view beyond the delimiter.
-    increase_sv_position(sv, i + 1);
+    noh_sv_increase_position(sv, i + 1);
 
     return result;
 }
@@ -798,7 +804,7 @@ Noh_String_View noh_sv_chop_while(Noh_String_View *sv, bool (*do_chop)(char)) {
     Noh_String_View result = { .count = i, .elems = sv->elems };
 
     // Update the current string view to after this point.
-    increase_sv_position(sv, i);
+    noh_sv_increase_position(sv, i);
 
     return result;
 }
@@ -814,11 +820,11 @@ Noh_String_View noh_sv_chop_line(Noh_String_View *sv) {
     // Update the current string view beyond the line separator(s).
     if (i + 1 < sv->count && sv->elems[i] == '\r' && sv->elems[i + 1] == '\n') {
         // Skip carriage return and newline.
-        increase_sv_position(sv, i + 2);
+        noh_sv_increase_position(sv, i + 2);
     } else {
         // Skip single newline, carriage return or to the end
-        // (increase_sv_position will allows too high increases).
-        increase_sv_position(sv, i + 1);
+        // (noh_sv_increase_position allows too high increases).
+        noh_sv_increase_position(sv, i + 1);
     }
 
     return result;
@@ -827,7 +833,7 @@ Noh_String_View noh_sv_chop_line(Noh_String_View *sv) {
 void noh_sv_trim_left(Noh_String_View *sv, bool (*do_trim)(char)) {
     size_t i = 0;
     while (i < sv->count && (*do_trim)(sv->elems[i])) i++;
-    increase_sv_position(sv, i);
+    noh_sv_increase_position(sv, i);
 }
 
 void noh_sv_trim_right(Noh_String_View *sv, bool (*do_trim)(char)) {
@@ -921,7 +927,7 @@ int noh_sv_index_of(Noh_String_View a, Noh_String_View b) {
     int i = 0;
     while (a.count >= b.count) {
         if (noh_sv_starts_with(a, b)) return i;
-        increase_sv_position(&a, 1);
+        noh_sv_increase_position(&a, 1);
         i++;
     }
 
@@ -936,7 +942,7 @@ int noh_sv_index_of_ci(Noh_String_View a, Noh_String_View b) {
     int i = 0;
     while (a.count >= b.count) {
         if (noh_sv_starts_with_ci(a, b)) return i;
-        increase_sv_position(&a, 1);
+        noh_sv_increase_position(&a, 1);
         i++;
     }
 
@@ -948,6 +954,13 @@ const char *noh_sv_to_arena_cstr(Noh_Arena *arena, Noh_String_View sv)
     char *result = noh_arena_alloc(arena, sv.count + 1);
     memcpy(result, sv.elems, sv.count);
     result[sv.count] = '\0';
+    return result;
+}
+
+Noh_String_View noh_sv_substring(Noh_String_View *sv, size_t start, size_t length) { 
+    Noh_String_View result = (Noh_String_View) { sv->count, sv->elems };
+    noh_sv_increase_position(&result, start);
+    if (result.count > length) result.count = length;
     return result;
 }
 
