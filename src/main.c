@@ -3,13 +3,6 @@
 #define NOH_IMPLEMENTATION
 #include "noh.h"
 
-typedef enum {
-    TokenKeyword,
-    TokenSymbol,
-    TokenStringLiteral,
-    TokenIndent,
-} TokenType;
-
 typedef struct {
     Noh_String filename;
     size_t row;
@@ -53,6 +46,15 @@ typedef struct {
     size_t count;
     size_t capacity;
 } Lines;
+
+typedef enum {
+    TokenKeyword,
+    TokenComment,
+    TokenSymbol,
+    TokenStringLiteral,
+    TokenIndent,
+    TokenUnknown,
+} TokenType;
 
 typedef struct {
     Noh_String_View value;
@@ -125,6 +127,91 @@ void lex_elem(Tokens *tokens, Errors *errors, Line *line, size_t *start_col) {
     // If we only had whitespace left, just return.
     if (line->line.count == 0) return;
 
+    // Otherwise, check for the first character to see what we should try to parse.
+    switch (line->line.elems[0]) {
+        case '/':
+            // Try to parse a single- or multiline comment.
+            if (line->line.count < 2) {
+                Token token = {
+                    .type = TokenUnknown,
+                    .loc = location_move_right(line->start, *start_col),
+                    .value = noh_sv_substring(&line->line, 0, 1)
+                };
+                noh_da_append(tokens, token);
+
+                Error error = {
+                    .message = noh_sv_from_cstr("End of line reached while trying to parse a comment."),
+                    .type = LexerError,
+                    .loc = location_move_right(line->start, *start_col + 1)
+                };
+                noh_da_append(errors, error);
+
+                *start_col += 1;
+                noh_sv_increase_position(&line->line, 1);
+                return;
+            }
+
+            if (line->line.elems[1] == '/') {
+                // Single-line comment.
+                Token token = {
+                    .type = TokenComment,
+                    .loc = location_move_right(line->start, *start_col),
+                    .value = line->line
+                };
+                noh_da_append(tokens, token);
+
+                *start_col += line->line.count;
+                noh_sv_increase_position(&line->line, line->line.count);
+                return;
+            } else if (line->line.elems[1] == '*') {
+                // Multiline comment.
+            } else {
+                Token token = {
+                    .type = TokenUnknown,
+                    .loc = location_move_right(line->start, *start_col),
+                    .value = noh_sv_substring(&line->line, 0, 1)
+                };
+                noh_da_append(tokens, token);
+
+                Error error = {
+                    .message = noh_sv_from_cstr("Unknown token '/'"),
+                    .type = LexerError,
+                    .loc = location_move_right(line->start, *start_col)
+                };
+                noh_da_append(errors, error);
+
+                *start_col += 1;
+                noh_sv_increase_position(&line->line, 1);
+                return;
+            }
+            break;
+        case '#':
+            // Try to parse a pound-include keyword.
+            break;
+        case '<':
+            // Try to parse a <> string.
+            break;
+        case '"':
+            // Try to parse a "" string.
+            break;
+        case '\'':
+            // Try to parse a character.
+            break;
+        case '(':
+            // Try to parse '()' or parenthesis symbol.
+            break;
+        case '-':
+            // Try to parse '->' symbol.
+            break;
+        case '=':
+            // return '=' symbol.
+            break;
+        default:
+            // Try to get number or alphanumeric keyword.
+            break;
+    }
+
+
     // Otherwise, get the next token.
     Noh_String_View token_str = noh_sv_chop_while(&line->line, *is_not_whitespace);
     Token token = {
@@ -191,17 +278,29 @@ int main(int argc, char **argv) {
 
     noh_log(NOH_INFO, "Lexer result.");
     Noh_String pos = {0};
+    Noh_String type = {0};
     for (size_t i = 0; i < tokens.count; i++) {
-        format_location(&arena, &pos, tokens.elems[i].loc);
-        printf(Nsv_Fmt ": '" Nsv_Fmt "'\n", Nsv_Arg(pos), Nsv_Arg(tokens.elems[i].value));
+        Token token = tokens.elems[i];
+
+        switch (token.type) {
+            case TokenKeyword: noh_string_append_cstr(&type, "Keyword"); break;
+            case TokenComment: noh_string_append_cstr(&type, "Comment"); break;
+            case TokenSymbol: noh_string_append_cstr(&type, "Symbol"); break;
+            case TokenStringLiteral: noh_string_append_cstr(&type, "StringLiteral"); break;
+            case TokenIndent: noh_string_append_cstr(&type, "Indent"); break;
+            case TokenUnknown: noh_string_append_cstr(&type, "Unknown"); break;
+        }
+
+        format_location(&arena, &pos, token.loc);
+        printf(Nsv_Fmt ": " Nsv_Fmt " - '" Nsv_Fmt "'\n", Nsv_Arg(pos), Nsv_Arg(type), Nsv_Arg(token.value));
         noh_string_reset(&pos);
+        noh_string_reset(&type);
     }
     noh_string_free(&pos);
 
 
     if (errors.count > 0) {
         noh_log(NOH_ERROR, "Lexer failed.");
-
         Noh_String pos = {0};
         for (size_t i = 0; i < errors.count; i++) {
             format_location(&arena, &pos, errors.elems[i].loc);
