@@ -321,6 +321,9 @@ typedef struct {
     size_t capacity;
 } Noh_String;
 
+// Creates a NohString from a c-string.
+Noh_String noh_string_from_cstr(const char *cstr);
+
 // Appends a null-terminated string into a Noh_String.
 void noh_string_append_cstr(Noh_String *string, const char *cstr);
 
@@ -348,6 +351,14 @@ typedef struct {
 // that delimiter. The string view itself is shrunk to start after the delimiter.
 Noh_String_View noh_sv_chop_by_delim(Noh_String_View *sv, char delim);
 
+// Finds the first occurrence of a line separator in a string view and returns the part of the string until 
+// that separator. The string view itself is shrunk to start after the separator.
+// Supports '/r', '/n' and '/r/n'.
+Noh_String_View noh_sv_chop_line(Noh_String_View *sv);
+
+// Chops a string while a predicate matches.
+Noh_String_View noh_sv_chop_while(Noh_String_View *sv, bool (*do_chop)(char));
+
 // Trims the left part of a string view, until the provided function no longer holds on the current character.
 void noh_sv_trim_left(Noh_String_View *sv, bool (*do_trim)(char));
 
@@ -358,16 +369,19 @@ void noh_sv_trim_right(Noh_String_View *sv, bool (*do_trim)(char));
 void noh_sv_trim(Noh_String_View *sv, bool (*do_trim)(char));
 
 // Trims spaces from the left part of a string view.
-void noh_sv_trim_space_left(Noh_String_View *sv);
+inline void noh_sv_trim_space_left(Noh_String_View *sv);
 
 // Trims spaces from the right part of a string view.
-void noh_sv_trim_space_right(Noh_String_View *sv);
+inline void noh_sv_trim_space_right(Noh_String_View *sv);
 
 // Trims spaces from both sides of a string view.
-void noh_sv_space_trim(Noh_String_View *sv);
+inline void noh_sv_trim_space(Noh_String_View *sv);
 
 // Creates a string view from a c-string.
 Noh_String_View noh_sv_from_cstr(const char *cstr);
+
+// Creates a string view from a string.
+Noh_String_View noh_sv_from_string(const Noh_String *string);
 
 // Checks whether to string views contain the same string.
 bool noh_sv_eq(Noh_String_View a, Noh_String_View b);
@@ -382,18 +396,26 @@ bool noh_sv_starts_with(Noh_String_View a, Noh_String_View b);
 bool noh_sv_starts_with_ci(Noh_String_View a, Noh_String_View b);
 
 // Checks whether the first string view contains the elements from the second string view.
-bool noh_sv_contains(Noh_String_View a, Noh_String_View b);
+inline bool noh_sv_contains(Noh_String_View a, Noh_String_View b);
+
+// Returns the first index of the second string view in the first string view.
+// Returns -1 if it is not found.
+int noh_sv_index_of(Noh_String_View a, Noh_String_View b);
 
 // Checks whether the first string view contains the elements from the second string view, ignoring the case.
-bool noh_sv_contains_ci(Noh_String_View a, Noh_String_View b);
+inline bool noh_sv_contains_ci(Noh_String_View a, Noh_String_View b);
+
+// Returns the first index of the second string view in the first string view, ignoring the case.
+// Returns -1 if it is not found.
+int noh_sv_index_of_ci(Noh_String_View a, Noh_String_View b);
 
 // Creates a cstring in an arena from a string view.
 const char *noh_sv_to_arena_cstr(Noh_Arena *arena, Noh_String_View sv);
 
 
-// printf macros for Noh_String_View
+// printf macros for Noh_String_View or Noh_String.
 #define Nsv_Fmt "%.*s"
-#define Nsv_Arg(sv) (int) (sv).count, (sv).data
+#define Nsv_Arg(sv) (int) (sv).count, (sv).elems
 // USAGE:
 //   Noh_String_View name = ...;
 //   printf("Name: "Nsv_Fmt"\n", Nsv_Arg(name));
@@ -697,6 +719,12 @@ char *noh_arena_sprintf(Noh_Arena *arena, const char *format, ...) {
 
 ///////////////////////// Strings /////////////////////////
 
+Noh_String noh_string_from_cstr(const char *cstr) {
+    Noh_String str = {0};
+    noh_string_append_cstr(&str, cstr);
+    return str;
+}
+
 void noh_string_append_cstr(Noh_String *string, const char *cstr) {
     size_t len = strlen(cstr);
     noh_da_append_multiple(string, cstr, len);
@@ -761,6 +789,41 @@ Noh_String_View noh_sv_chop_by_delim(Noh_String_View *sv, char delim) {
     return result;
 }
 
+Noh_String_View noh_sv_chop_while(Noh_String_View *sv, bool (*do_chop)(char)) {
+    size_t i = 0;
+    // Keep going until the end or the function no longer matches.
+    while (i < sv->count && ((*do_chop)(sv->elems[i]))) i++;
+
+    // The data until this point is returned.
+    Noh_String_View result = { .count = i, .elems = sv->elems };
+
+    // Update the current string view to after this point.
+    increase_sv_position(sv, i);
+
+    return result;
+}
+
+Noh_String_View noh_sv_chop_line(Noh_String_View *sv) {
+    size_t i = 0;
+    // Find a newline or carriage return character.
+    while (i < sv->count && sv->elems[i] != '\r' && sv->elems[i] != '\n') i++;
+
+    // The data until the line separator(s) is returned.
+    Noh_String_View result = { .count = i, .elems = sv->elems };
+
+    // Update the current string view beyond the line separator(s).
+    if (i + 1 < sv->count && sv->elems[i] == '\r' && sv->elems[i + 1] == '\n') {
+        // Skip carriage return and newline.
+        increase_sv_position(sv, i + 2);
+    } else {
+        // Skip single newline, carriage return or to the end
+        // (increase_sv_position will allows too high increases).
+        increase_sv_position(sv, i + 1);
+    }
+
+    return result;
+}
+
 void noh_sv_trim_left(Noh_String_View *sv, bool (*do_trim)(char)) {
     size_t i = 0;
     while (i < sv->count && (*do_trim)(sv->elems[i])) i++;
@@ -782,15 +845,15 @@ bool is_space(char c) {
     return isspace(c) > 0;
 }
 
-void noh_sv_trim_space_left(Noh_String_View *sv) {
+inline void noh_sv_trim_space_left(Noh_String_View *sv) {
     noh_sv_trim_left(sv, &is_space);
 }
 
-void noh_sv_trim_space_right(Noh_String_View *sv) {
+inline void noh_sv_trim_space_right(Noh_String_View *sv) {
     noh_sv_trim_right(sv, &is_space);
 }
 
-void noh_sv_trim_space(Noh_String_View *sv) {
+inline void noh_sv_trim_space(Noh_String_View *sv) {
     noh_sv_trim(sv, &is_space);
 }
 
@@ -798,6 +861,13 @@ Noh_String_View noh_sv_from_cstr(const char *cstr) {
     Noh_String_View result = {0};
     result.elems = cstr;
     result.count = strlen(cstr);
+    return result;
+}
+
+Noh_String_View noh_sv_from_string(const Noh_String *string) {
+    Noh_String_View result = {0};
+    result.elems = string->elems;
+    result.count = string->count;
     return result;
 }
 
@@ -843,22 +913,34 @@ bool noh_sv_starts_with_ci(Noh_String_View a, Noh_String_View b) {
     return noh_sv_eq_ci(a, b);
 }
 
-bool noh_sv_contains(Noh_String_View a, Noh_String_View b) {
-    while (a.count >= b.count) {
-        if (noh_sv_starts_with(a, b)) return true;
-        increase_sv_position(&a, 1);
-    }
-
-    return false;
+inline bool noh_sv_contains(Noh_String_View a, Noh_String_View b) {
+    return noh_sv_index_of(a, b) >= 0;
 }
 
-bool noh_sv_contains_ci(Noh_String_View a, Noh_String_View b) {
+int noh_sv_index_of(Noh_String_View a, Noh_String_View b) {
+    int i = 0;
     while (a.count >= b.count) {
-        if (noh_sv_starts_with_ci(a, b)) return true;
+        if (noh_sv_starts_with(a, b)) return i;
         increase_sv_position(&a, 1);
+        i++;
     }
 
-    return false;
+    return -1;
+}
+
+inline bool noh_sv_contains_ci(Noh_String_View a, Noh_String_View b) {
+    return noh_sv_index_of_ci(a, b) >= 0;
+}
+
+int noh_sv_index_of_ci(Noh_String_View a, Noh_String_View b) {
+    int i = 0;
+    while (a.count >= b.count) {
+        if (noh_sv_starts_with_ci(a, b)) return i;
+        increase_sv_position(&a, 1);
+        i++;
+    }
+
+    return -1;
 }
 
 const char *noh_sv_to_arena_cstr(Noh_Arena *arena, Noh_String_View sv)
