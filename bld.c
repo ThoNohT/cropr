@@ -81,6 +81,13 @@ int main(int argc, char **argv) {
 
         Noh_Cmd cmd = {0};
         noh_cmd_append(&cmd, "./build/cropr");
+
+        if (argc == 0) {
+            // For easy debugging, use hello world example for now when running.
+            noh_cmd_append(&cmd, "examples/hello_world.cr");
+        }
+
+        while (argc > 0) noh_cmd_append(&cmd, noh_shift_args(&argc, &argv)); 
         if (!noh_cmd_run_sync(cmd)) return 1;
         noh_cmd_free(&cmd);
 
