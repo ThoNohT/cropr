@@ -399,6 +399,12 @@ bool noh_sv_starts_with(Noh_String_View a, Noh_String_View b);
 // Checks whether the first string view starts with the elements from second string view, ignoring the case.
 bool noh_sv_starts_with_ci(Noh_String_View a, Noh_String_View b);
 
+// Checks whether the first string view ends with the elements from second string view.
+bool noh_sv_ends_with(Noh_String_View a, Noh_String_View b);
+
+// Checks whether the first string view ends with the elements from second string view, ignoring the case.
+bool noh_sv_ends_with_ci(Noh_String_View a, Noh_String_View b);
+
 // Checks whether the first string view contains the elements from the second string view.
 inline bool noh_sv_contains(Noh_String_View a, Noh_String_View b);
 
@@ -915,6 +921,20 @@ bool noh_sv_starts_with(Noh_String_View a, Noh_String_View b) {
 
 bool noh_sv_starts_with_ci(Noh_String_View a, Noh_String_View b) {
     if (a.count < b.count) return false;
+    a.count = b.count;
+    return noh_sv_eq_ci(a, b);
+}
+
+bool noh_sv_ends_with(Noh_String_View a, Noh_String_View b) {
+    if (a.count < b.count) return false;
+    a.elems += (a.count - b.count);
+    a.count = b.count;
+    return noh_sv_eq(a, b);
+}
+
+bool noh_sv_ends_with_ci(Noh_String_View a, Noh_String_View b) {
+    if (a.count < b.count) return false;
+    a.elems += (a.count - b.count);
     a.count = b.count;
     return noh_sv_eq_ci(a, b);
 }
