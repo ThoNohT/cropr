@@ -1,21 +1,9 @@
-typedef struct {
-    Noh_String_View line;
-    Location start;
-} Line;
-
-typedef struct {
-    Line *elems;
-    size_t count;
-    size_t capacity;
-} Lines;
-
 typedef enum {
+    TokenIndent,
+    TokenWhitespace,
     TokenKeyword,
-    TokenComment,
     TokenSymbol,
     TokenStringLiteral,
-    TokenIndent,
-    TokenUnknown,
 } TokenType;
 
 typedef struct {

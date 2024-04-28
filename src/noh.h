@@ -423,7 +423,8 @@ int noh_sv_index_of_ci(Noh_String_View a, Noh_String_View b);
 const char *noh_sv_to_arena_cstr(Noh_Arena *arena, Noh_String_View sv);
 
 // Creates a substring from a string-view, where the start and end are capped to the bounds of the input string view.
-Noh_String_View noh_sv_substring(Noh_String_View *sv, size_t start, size_t length);
+// If a length of 0 is provided, the entire string after start is returned.
+Noh_String_View noh_sv_substring(Noh_String_View sv, size_t start, size_t length);
 
 // printf macros for Noh_String_View or Noh_String.
 #define Nsv_Fmt "%.*s"
@@ -977,10 +978,10 @@ const char *noh_sv_to_arena_cstr(Noh_Arena *arena, Noh_String_View sv)
     return result;
 }
 
-Noh_String_View noh_sv_substring(Noh_String_View *sv, size_t start, size_t length) { 
-    Noh_String_View result = (Noh_String_View) { sv->count, sv->elems };
+Noh_String_View noh_sv_substring(Noh_String_View sv, size_t start, size_t length) { 
+    Noh_String_View result = (Noh_String_View) { sv.count, sv.elems };
     noh_sv_increase_position(&result, start);
-    if (result.count > length) result.count = length;
+    if (result.count > length && length > 0) result.count = length;
     return result;
 }
 

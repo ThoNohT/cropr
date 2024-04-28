@@ -29,12 +29,11 @@ int main(int argc, char **argv) {
         Token token = tokens.elems[i];
 
         switch (token.type) {
+            case TokenIndent: noh_string_append_cstr(&type, "Indent"); break;
+            case TokenWhitespace: noh_string_append_cstr(&type, "Whitespace"); break;
             case TokenKeyword: noh_string_append_cstr(&type, "Keyword"); break;
-            case TokenComment: noh_string_append_cstr(&type, "Comment"); break;
             case TokenSymbol: noh_string_append_cstr(&type, "Symbol"); break;
             case TokenStringLiteral: noh_string_append_cstr(&type, "StringLiteral"); break;
-            case TokenIndent: noh_string_append_cstr(&type, "Indent"); break;
-            case TokenUnknown: noh_string_append_cstr(&type, "Unknown"); break;
         }
 
         format_location(&arena, &pos, token.loc);
