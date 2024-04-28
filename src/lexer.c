@@ -14,8 +14,8 @@ typedef struct {
     size_t capacity;
 } Lines;
 
-// The list of symbols that should be parsed as full symbols.
-// When in this list, the full symbol will be attempted to be parsed, otherwise, any individual character is
+// The list of symbols that should be lexed as full symbols.
+// When in this list, the full symbol will be attempted to be lexed, otherwise, any individual character is
 // considered a unique symbol if it isn't alphanumeric.
 static char *multichar_symbols[] = { "::", "()", "->", "//", "/*", "*/" };
 
@@ -35,7 +35,32 @@ static bool is_alphanum(char c) {
     return is_alpha(c) || is_numeric(c);
 }
 
-static Token parse_symbol(Line *line, size_t *start_col) {
+static Token lex_number(Line *line, size_t *start_col) {
+    Noh_String_View start = line->line;
+    Noh_String_View pre = noh_sv_chop_while(&line->line, *is_numeric);
+    if (line->line.count > 0 && line->line.elems[0] == '.') {
+        noh_sv_increase_position(&line->line, 1);
+        Noh_String_View post = noh_sv_chop_while(&line->line, *is_numeric);
+
+        Token token = {
+            .type = TokenNumberLiteral,
+            .loc = location_move_right(line->start, *start_col),
+            .value = noh_sv_substring(start, 0, pre.count + post.count + 1)
+        };
+        *start_col += pre.count + post.count + 1;
+        return token;
+    } else {
+        Token token = {
+            .type = TokenNumberLiteral,
+            .loc = location_move_right(line->start, *start_col),
+            .value = pre
+        };
+        *start_col += pre.count;
+        return token;
+    }
+}
+
+static Token lex_symbol(Line *line, size_t *start_col) {
     // It can be a multichar symbol.
     for (size_t i = 0; i < noh_array_len(multichar_symbols); i++) {
         Noh_String_View symbol = noh_sv_from_cstr(multichar_symbols[i]);
@@ -62,8 +87,8 @@ static Token parse_symbol(Line *line, size_t *start_col) {
     return token;
 }
 
-// Parses a string literal, continuing until the specified end symbol.
-static void parse_literal(Tokens *tokens, Errors *errors, Line *line, size_t *start_col, char end_symbol) {
+// Lexes a string literal, continuing until the specified end symbol.
+static void lex_literal(Tokens *tokens, Errors *errors, Line *line, size_t *start_col, char end_symbol) {
     noh_sv_increase_position(&line->line, 1);
     Noh_String_View start = line->line;
     size_t length = 0;
@@ -78,7 +103,7 @@ static void parse_literal(Tokens *tokens, Errors *errors, Line *line, size_t *st
     if (line->line.count == 0) {
         Error error = {
             .type = LexerError,
-            .message = noh_sv_from_cstr("Line ended while parsing string literal."),
+            .message = noh_sv_from_cstr("Line ended while lexing string literal."),
             .loc = location_move_right(line->start, *start_col)
         };
         noh_da_append(errors, error);
@@ -86,7 +111,7 @@ static void parse_literal(Tokens *tokens, Errors *errors, Line *line, size_t *st
 
     // Add the string token regardless.
     Token token = {
-        .type = TokenSymbol,
+        .type = TokenStringLiteral,
         .loc = location_move_right(line->start, *start_col),
         .value = noh_sv_substring(start, 0, length)
     };
@@ -144,9 +169,9 @@ static void lex_elem(Tokens *tokens, Errors *errors, Line *line, size_t *start_c
     if (line->line.count == 0) return;
 
     char c = line->line.elems[0];
-    // Otherwise, check for the first character to see what we should try to parse.
+    // Otherwise, check for the first character to see what we should try to lex.
     if (is_alpha(c)) {
-        // Try to parse a keyword.
+        // Try to lex a keyword.
         Noh_String_View value = noh_sv_chop_while(&line->line, *is_alphanum);
         Token token = {
             .type = TokenKeyword,
@@ -155,8 +180,11 @@ static void lex_elem(Tokens *tokens, Errors *errors, Line *line, size_t *start_c
         };
         noh_da_append(tokens, token);
         *start_col += value.count;
+    } else if (is_numeric(c)) {
+        // Try to lex a number
+        noh_da_append(tokens, lex_number(line, start_col));
     } else if (c == '#') {
-        // Try to parse a pound keyword.
+        // Try to lex a pound keyword.
         Noh_String_View after_hash = noh_sv_substring(line->line, 1, 0);
         Noh_String_View value = noh_sv_chop_while(&after_hash, *is_alphanum);
         if (value.count > 0) {
@@ -181,14 +209,14 @@ static void lex_elem(Tokens *tokens, Errors *errors, Line *line, size_t *start_c
             *start_col += 1;
         }
     } else if (c == '"') {
-        // Try to parse a regular string.
-        parse_literal(tokens, errors, line, start_col, '"');
+        // Try to lex a regular string.
+        lex_literal(tokens, errors, line, start_col, '"');
     } else if (c == '\'') {
-        parse_literal(tokens, errors, line, start_col, '\'');
+        lex_literal(tokens, errors, line, start_col, '\'');
     } else if (c == '<' && line->has_pound) {
-        parse_literal(tokens, errors, line, start_col, '>');
+        lex_literal(tokens, errors, line, start_col, '>');
     } else {
-        noh_da_append(tokens, parse_symbol(line, start_col));
+        noh_da_append(tokens, lex_symbol(line, start_col));
     }
 }
 

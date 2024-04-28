@@ -4,6 +4,7 @@ typedef enum {
     TokenKeyword,
     TokenSymbol,
     TokenStringLiteral,
+    TokenNumberLiteral,
 } TokenType;
 
 typedef struct {

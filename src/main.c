@@ -34,6 +34,7 @@ int main(int argc, char **argv) {
             case TokenKeyword: noh_string_append_cstr(&type, "Keyword"); break;
             case TokenSymbol: noh_string_append_cstr(&type, "Symbol"); break;
             case TokenStringLiteral: noh_string_append_cstr(&type, "StringLiteral"); break;
+            case TokenNumberLiteral: noh_string_append_cstr(&type, "NumberLiteral"); break;
         }
 
         format_location(&arena, &pos, token.loc);
