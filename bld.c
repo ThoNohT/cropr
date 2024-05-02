@@ -91,6 +91,7 @@ bool build_lexer(Noh_Arena *arena, Noh_Cmd *cmd, Noh_File_Paths *ucp) {
 bool build_parser(Noh_Arena *arena, Noh_Cmd *cmd, Noh_File_Paths *ucp) {
     noh_da_append(ucp, "./src/noh.h");
     noh_da_append(ucp, "./src/common.h");
+    noh_da_append(ucp, "./src/lexer.h");
     noh_da_append(ucp, "./src/parser.h");
     noh_da_append(ucp, "./src/parser.c");
 
