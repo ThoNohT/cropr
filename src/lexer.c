@@ -1,5 +1,4 @@
 #include "noh.h"
-#include "common.h"
 #include "lexer.h"
 
 typedef struct {
