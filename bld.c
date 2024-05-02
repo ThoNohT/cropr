@@ -88,22 +88,36 @@ bool build_lexer(Noh_Arena *arena, Noh_Cmd *cmd, Noh_File_Paths *ucp) {
     return build(arena, cmd, ucp, "lexer.c", "liblexer.o", NULL);
 }
 
+bool build_parser(Noh_Arena *arena, Noh_Cmd *cmd, Noh_File_Paths *ucp) {
+    noh_da_append(ucp, "./src/noh.h");
+    noh_da_append(ucp, "./src/common.h");
+    noh_da_append(ucp, "./src/parser.h");
+    noh_da_append(ucp, "./src/parser.c");
+
+    // Depends on libnoh.o
+
+    return build(arena, cmd, ucp, "parser.c", "libparser.o", NULL);
+}
+
 bool build_cropr(Noh_Arena *arena, Noh_Cmd *cmd, Noh_File_Paths *ucp, Linker_Params *lp) {
     // First build dependencies.
     if (!build_noh(arena, cmd, ucp)) return false;
     if (!build_common(arena, cmd, ucp)) return false;
     if (!build_lexer(arena, cmd, ucp)) return false;
+    if (!build_parser(arena, cmd, ucp)) return false;
 
     noh_da_append(ucp, "./src/main.c");
     noh_da_append(ucp, "./build/libnoh.o");
     noh_da_append(ucp, "./build/libcommon.o");
     noh_da_append(ucp, "./build/liblexer.o");
+    noh_da_append(ucp, "./build/libparser.o");
 
     noh_da_append(lp, "-lm");
     noh_da_append(lp, "-L./build");
+    noh_da_append(lp, "-l:libnoh.o");
     noh_da_append(lp, "-l:libcommon.o");
     noh_da_append(lp, "-l:liblexer.o");
-    noh_da_append(lp, "-l:libnoh.o");
+    noh_da_append(lp, "-l:libparser.o");
 
     return build(arena, cmd, ucp, "main.c", "cropr", lp);
 }
