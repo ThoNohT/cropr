@@ -220,13 +220,10 @@ static void lex_elem(Tokens *tokens, Errors *errors, Line *line, size_t *start_c
     }
 }
 
-void lex_file(Noh_Arena *arena, Noh_String_View sv, char *filename, Tokens *tokens, Errors *errors) {
-    (void)arena; // TODO: Do we need this arena?
+void lex_file(Noh_String_View sv, char *filename, Tokens *tokens, Errors *errors) {
     Lines lines = {0};
     // Note that this string should not be freed, as it will live in the locations of the tokens.
     Noh_String fn_str = noh_string_from_cstr(filename);
-
-    Location start_loc = (Location) { fn_str, 1, 1 };
 
     // Split up in lines.
     size_t line_counter = 0;
@@ -244,12 +241,5 @@ void lex_file(Noh_Arena *arena, Noh_String_View sv, char *filename, Tokens *toke
         lex_indent(tokens, errors, &line, &end_col); // Check for indentation.
         while (line.line.count > 0) lex_elem(tokens, errors, &line, &end_col);
     }
-
-    Error error = {
-        .type = LexerError,
-        .message = noh_sv_from_cstr("Lexer implementation is not yet finished."),
-        .loc = start_loc
-    };
-    noh_da_append(errors, error);
 }
 

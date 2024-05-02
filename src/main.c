@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
 
     Tokens tokens = {0};
     Errors errors = {0};
-    lex_file(&arena, noh_sv_from_string(&file_contents), filename, &tokens, &errors);
+    lex_file(noh_sv_from_string(&file_contents), filename, &tokens, &errors);
 
     noh_log(NOH_INFO, "Lexer result.");
     Noh_String pos = {0};
