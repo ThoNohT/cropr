@@ -23,6 +23,9 @@ int main(int argc, char **argv) {
     Errors errors = {0};
     lex_file(noh_sv_from_string(&file_contents), filename, &tokens, &errors);
 
+    Program program;
+    parse_file(&tokens, &errors, &program);
+
     noh_log(NOH_INFO, "Lexer result.");
     Noh_String pos = {0};
     Noh_String type = {0};
@@ -47,7 +50,7 @@ int main(int argc, char **argv) {
 
 
     if (errors.count > 0) {
-        noh_log(NOH_ERROR, "Lexer failed.");
+        noh_log(NOH_ERROR, "Lexer or parser failed.");
         Noh_String pos = {0};
         for (size_t i = 0; i < errors.count; i++) {
             format_location(&arena, &pos, errors.elems[i].loc);

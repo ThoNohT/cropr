@@ -4,25 +4,31 @@
 #include "common.h"
 #include "lexer.h"
 
-typedef struct {} PoundPreProc;
+// Preprocessor expression.
+typedef struct {
+    Location loc;
+    Token *tokens;
+    size_t token_count;
+} PreProc;
+
 typedef struct {} FunctionDefinition;
 typedef struct {} FunctionImplementation;
-typedef struct {} CExpression;
+typedef struct {} Expression;
 
 typedef enum {
-    ST_PoundPreProc,
+    ST_PreProc,
     ST_FunctionDefinition,
     ST_FunctionImplementation,
-    ST_CExpression,
+    ST_Expression,
 } StatementType;
 
 typedef struct {
     StatementType type;
     union {
-        PoundPreProc *preproc;
+        PreProc *preproc;
         FunctionDefinition *fundef;
         FunctionImplementation *funimpl;
-        CExpression *cexpr;
+        Expression *expr;
     };
 } Statement;
 
@@ -35,6 +41,6 @@ typedef struct {
 
 
 // Parses the tokens lexed from a file into a syntax tree.
-void parse_file(Tokens *tokens, Errors *errors);
+Program *parse_file(Noh_Arena *arena, Tokens tokens, Errors *errors);
 
 #endif // _PARSER_H
